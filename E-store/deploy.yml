@@ -1,0 +1,16 @@
+- hosts: localhost
+  user: fcidigitalservices
+  become: true
+  tasks:
+   - name: stop tomcat
+     service: name=tomcat state=stopped
+   - name: delete web application war file
+     file: path=/var/lib/tomcat/webapps/eStore.war
+           state=absent
+   - name: delete web application directory
+     file: path=/var/lib/tomcat/webapps/eStore
+           state=absent
+   - name: deploy web application
+     copy: src=/opt/eStoreWar/eStore.war dest=/opt/tomcat/webapps/eStore.war
+   - name: start tomcat
+     service: name=tomcat state=started

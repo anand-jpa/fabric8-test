@@ -1,0 +1,118 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: dbsecret
+type: Opaque
+data:
+  DBPassword: root
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: estore-dbpvc
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi   
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: estore-db
+spec:
+  selector:
+   matchLabels:
+     app: estore-db
+  template:
+    metadata:
+      labels:
+        app: estore-db
+    spec:
+      volumes:
+      - name: sqldump
+        configMap:
+          name: sqldump
+      - name: dbdata
+        persistentVolumeClaim:
+          claimName: estore-dbpvc
+      containers:
+      - name: estore-db
+        image: mysql:5.7
+        volumeMounts:
+        - name: sqldump
+          mountPath: /docker-entrypoint-initdb.d
+        - name: dbdata
+          mountPath: /var/lib/mysql
+        env:
+        - name: MYSQL_DATABASE
+          value: neweshop
+        - name: MYSQL_ROOT_PASSWORD
+          value: root
+        - name: MYSQL_USER
+          value: newestore
+        - name: MYSQL_PASSWORD
+          value: root
+        ports:
+        - containerPort: 3306       
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: estore-db
+  labels:
+    app: estore-db
+spec:
+  ports:
+  - port: 3306
+    protocol: TCP
+  selector:
+     app: estore-db
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: estore-app
+spec:
+  selector:
+    matchLabels:
+      app: estore-app
+  template:
+    metadata:
+      labels:
+        app: estore-app
+    spec:
+      initContainers:
+      - name: justwait
+        image: busybox
+        command: ['sh', '-c', 'sleep 30']
+      containers:
+      - name: estore-app
+        image: docker-registry.default.svc:5000/e-store/estore
+        ports:
+        - containerPort: 8080
+          name: estore-app-port
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: estore-app
+  labels:
+    app: estore-app
+spec:
+  ports:
+  - port: 8080
+    protocol: TCP
+  selector:
+     app: estore-app
+---
+apiVersion: v1
+kind: Route
+metadata:
+  name: frontend
+spec:
+  to:
+    kind: Service
+    name: estore-app
+---
